@@ -10,14 +10,23 @@ def call(Map config = [:]) {
 
     echo "Deploying to namespace '${namespace}' with image tag '${imageTag}'"
 
-    // Apply the manifests
-    sh "kubectl apply -f ${manifestPath} -n ${namespace}"
-
-    // Update the image tag on all deployments found in the manifest directory
-    def deployments = sh(
-        script: "kubectl get deployments -n ${namespace} -o jsonpath='{.items[*].metadata.name}'",
+    // Apply the manifests and capture which resources were created/configured
+    def applyOutput = sh(
+        script: "kubectl apply -f ${manifestPath} -n ${namespace}",
         returnStdout: true
-    ).trim().split('\\s+')
+    ).trim()
+    echo applyOutput
+
+    // Extract only the deployment names from the apply output
+    // Lines look like: "deployment.apps/frontend-deployment configured"
+    def deployments = applyOutput.split('\n')
+        .findAll { it.startsWith('deployment.apps/') }
+        .collect { it.split('/')[1].split('\\s+')[0] }
+
+    if (deployments.isEmpty()) {
+        echo "WARNING: No deployments found in ${manifestPath}; skipping image update."
+        return
+    }
 
     for (dep in deployments) {
         def containers = sh(
