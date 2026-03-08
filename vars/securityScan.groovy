@@ -17,11 +17,15 @@ def call(Map config = [:]) {
     def reportFile  = "trivy-report-${imageName.replaceAll('/', '-')}-${tag}.json"
     def tableReport = "trivy-report-${imageName.replaceAll('/', '-')}-${tag}.txt"
 
+    // Use .trivyignore if present in the repo
+    def ignoreFlag = fileExists('.trivyignore') ? '--ignorefile .trivyignore' : ''
+
     echo "Running Trivy scan on ${fullImage} (threshold: ${severityThreshold})"
 
     // Generate human-readable table report
     sh """
         trivy image --severity ${severityThreshold},CRITICAL \
+            ${ignoreFlag} \
             --format table \
             --output ${tableReport} \
             ${fullImage} || true
@@ -30,6 +34,7 @@ def call(Map config = [:]) {
     // Generate JSON report for archiving and downstream processing
     sh """
         trivy image --severity ${severityThreshold},CRITICAL \
+            ${ignoreFlag} \
             --format json \
             --output ${reportFile} \
             ${fullImage} || true
@@ -42,6 +47,7 @@ def call(Map config = [:]) {
     def exitCode = sh(
         script: """
             trivy image --severity ${severityThreshold} \
+                ${ignoreFlag} \
                 --exit-code 1 \
                 --quiet \
                 ${fullImage}
