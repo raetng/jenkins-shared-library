@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 
 /**
- * Deploys to Kubernetes by applying manifests and updating the image tag.
+ * Deploys to Kubernetes by substituting IMAGE_TAG in manifests before applying.
  */
 def call(Map config = [:]) {
     def namespace    = config.namespace    ?: error('namespace is required')
@@ -10,7 +10,10 @@ def call(Map config = [:]) {
 
     echo "Deploying to namespace '${namespace}' with image tag '${imageTag}'"
 
-    // Apply the manifests and capture which resources were created/configured
+    // Replace the IMAGE_TAG placeholder with the actual tag in manifest copies
+    sh "sed -i'' -e 's|IMAGE_TAG|${imageTag}|g' ${manifestPath}*.yaml"
+
+    // Apply the resolved manifests
     def applyOutput = sh(
         script: "kubectl apply -f ${manifestPath} -n ${namespace}",
         returnStdout: true
@@ -18,32 +21,10 @@ def call(Map config = [:]) {
     echo applyOutput
 
     // Extract only the deployment names from the apply output
-    // Lines look like: "deployment.apps/frontend-deployment configured"
+    // Lines look like: "deployment.apps/frontend configured"
     def deployments = applyOutput.split('\n')
         .findAll { it.startsWith('deployment.apps/') }
         .collect { it.split('/')[1].split('\\s+')[0] }
-
-    if (deployments.isEmpty()) {
-        echo "WARNING: No deployments found in ${manifestPath}; skipping image update."
-        return
-    }
-
-    for (dep in deployments) {
-        def containers = sh(
-            script: "kubectl get deployment ${dep} -n ${namespace} -o jsonpath='{.spec.template.spec.containers[*].name}'",
-            returnStdout: true
-        ).trim().split('\\s+')
-
-        for (container in containers) {
-            def currentImage = sh(
-                script: "kubectl get deployment ${dep} -n ${namespace} -o jsonpath='{.spec.template.spec.containers[?(@.name==\"${container}\")].image}'",
-                returnStdout: true
-            ).trim()
-
-            def baseImage = currentImage.contains(':') ? currentImage.split(':')[0] : currentImage
-            sh "kubectl set image deployment/${dep} ${container}=${baseImage}:${imageTag} -n ${namespace}"
-        }
-    }
 
     // Wait for rollout to complete
     for (dep in deployments) {
