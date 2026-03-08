@@ -50,6 +50,6 @@ def call(Map config = [:]) {
     )
 
     if (exitCode != 0) {
-        unstable("Trivy found vulnerabilities at severity ${severityThreshold} or above in ${fullImage}")
+        error("Trivy found vulnerabilities at severity ${severityThreshold} or above in ${fullImage}")
     }
 }

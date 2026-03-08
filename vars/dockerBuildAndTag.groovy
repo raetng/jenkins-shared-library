@@ -13,7 +13,7 @@ def call(Map config = [:]) {
 
     echo "Building image: ${imageName}:${tag} from ${dockerfilePath}"
 
-    sh "docker build -t ${imageName}:${tag} ${dockerfilePath}"
+    sh "docker build --provenance=false --pull -t ${imageName}:${tag} ${dockerfilePath}"
 
     return tag
 }

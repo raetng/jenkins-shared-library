@@ -10,9 +10,10 @@ def call(Map config = [:]) {
 
     echo "Pushing image: ${imageName}:${tag}"
 
-    docker.withRegistry('https://index.docker.io/v1/', credentialsId) {
-        def img = docker.image("${imageName}:${tag}")
-        img.push()
-        img.push('latest')
+    withCredentials([usernamePassword(credentialsId: credentialsId, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+        sh '''
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+        '''
+        sh "docker push ${imageName}:${tag}"
     }
 }
