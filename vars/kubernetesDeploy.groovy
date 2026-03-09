@@ -22,8 +22,13 @@ def call(Map config = [:]) {
     def srcDir  = "${k8sRoot}/${manifestPath.replaceAll('^k8s/', '').replaceAll('/\$', '')}"
     def tmpDir  = "${pwd()}/k8s-deploy-tmp"
 
-    // Copy manifests to a temp dir so sed doesn't modify originals
-    sh "rm -rf ${tmpDir} && mkdir -p ${tmpDir} && cp ${srcDir}/*.yaml ${tmpDir}/"
+    // Copy manifests to a temp dir so sed doesn't modify originals.
+    // Exclude env-specific PVC files for other environments (pvc-dev.yaml, pvc-staging.yaml, pvc-prod.yaml).
+    // Only include the PVC matching the target namespace.
+    def otherEnvs = ['dev', 'staging', 'prod'] - [namespace]
+    def excludes = otherEnvs.collect { "--exclude='pvc-${it}.yaml'" }.join(' ')
+    sh "rm -rf ${tmpDir} && mkdir -p ${tmpDir}"
+    sh "rsync -a ${excludes} ${srcDir}/*.yaml ${tmpDir}/"
 
     // Replace the IMAGE_TAG placeholder with the actual tag
     sh "sed -i'' -e 's|IMAGE_TAG|${imageTag}|g' ${tmpDir}/*.yaml"
