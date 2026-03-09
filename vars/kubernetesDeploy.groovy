@@ -10,14 +10,24 @@ def call(Map config = [:]) {
 
     echo "Deploying to namespace '${namespace}' with image tag '${imageTag}'"
 
-    // Replace the IMAGE_TAG placeholder with the actual tag in manifest copies
-    sh "sed -i'' -e 's|IMAGE_TAG|${imageTag}|g' ${manifestPath}*.yaml"
+    def k8sRoot = '/Users/raetng/Documents/UChicago/DevOps/final/k8s'
+    def srcDir  = "${k8sRoot}/${manifestPath.replaceAll('^k8s/', '').replaceAll('/\$', '')}"
+    def tmpDir  = "${pwd()}/k8s-deploy-tmp"
+
+    // Copy manifests to a temp dir so sed doesn't modify originals
+    sh "rm -rf ${tmpDir} && mkdir -p ${tmpDir} && cp ${srcDir}/*.yaml ${tmpDir}/"
+
+    // Replace the IMAGE_TAG placeholder with the actual tag
+    sh "sed -i'' -e 's|IMAGE_TAG|${imageTag}|g' ${tmpDir}/*.yaml"
 
     // Apply the resolved manifests
     def applyOutput = sh(
-        script: "kubectl apply -f ${manifestPath} -n ${namespace}",
+        script: "kubectl apply -f ${tmpDir} -n ${namespace}",
         returnStdout: true
     ).trim()
+
+    // Clean up temp dir
+    sh "rm -rf ${tmpDir}"
     echo applyOutput
 
     // Extract only the deployment names from the apply output
