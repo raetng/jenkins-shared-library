@@ -28,14 +28,14 @@ def call(Map config = [:]) {
     def otherEnvs = ['dev', 'staging', 'prod'] - [namespace]
     def excludePattern = otherEnvs.collect { "pvc-${it}.yaml" }
     sh "rm -rf ${tmpDir} && mkdir -p ${tmpDir}"
-    // Use cp instead of rsync to avoid macOS mmap deadlock issues
+    // Use cat redirection instead of cp/rsync to avoid macOS fcopyfile deadlock
     sh """
         for f in ${srcDir}/*.yaml; do
             fname=\$(basename "\$f")
             case "\$fname" in
                 ${excludePattern.collect { "\"${it}\"" }.join('|')}) continue ;;
             esac
-            cp "\$f" "${tmpDir}/"
+            cat "\$f" > "${tmpDir}/\$fname"
         done
     """
 
