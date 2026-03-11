@@ -26,9 +26,18 @@ def call(Map config = [:]) {
     // Exclude env-specific PVC files for other environments (pvc-dev.yaml, pvc-staging.yaml, pvc-prod.yaml).
     // Only include the PVC matching the target namespace.
     def otherEnvs = ['dev', 'staging', 'prod'] - [namespace]
-    def excludes = otherEnvs.collect { "--exclude='pvc-${it}.yaml'" }.join(' ')
+    def excludePattern = otherEnvs.collect { "pvc-${it}.yaml" }
     sh "rm -rf ${tmpDir} && mkdir -p ${tmpDir}"
-    sh "rsync -a ${excludes} ${srcDir}/*.yaml ${tmpDir}/"
+    // Use cp instead of rsync to avoid macOS mmap deadlock issues
+    sh """
+        for f in ${srcDir}/*.yaml; do
+            fname=\$(basename "\$f")
+            case "\$fname" in
+                ${excludePattern.collect { "\"${it}\"" }.join('|')}) continue ;;
+            esac
+            cp "\$f" "${tmpDir}/"
+        done
+    """
 
     // Replace the IMAGE_TAG placeholder with the actual tag
     sh "sed -i'' -e 's|IMAGE_TAG|${imageTag}|g' ${tmpDir}/*.yaml"
